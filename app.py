@@ -1,74 +1,95 @@
-import streamlit as st
-import speech_recognition as sr
-import openai
+import threading
 import pandas as pd
-from streamlit.components.v1 import html
+import requests
+import streamlit as st
+import pyttsx3
+import speech_recognition as sr
 
-# Initialize the necessary components
-openai.api_key = 'YOUR_API_KEY'
+# Initialize Pyttsx3 for text-to-speech
+engine = pyttsx3.init()
+
+# Initialize Speech Recognition
 recognizer = sr.Recognizer()
 
+# Gemini API Key
+GEMINI_API_KEY = 'AIzaSyAUGR8InzzEjXgc5AyTnR9kLObx3qYRrvs'
+
+def speak_text(text):
+    def tts():
+        engine.say(text)
+        engine.runAndWait()
+    
+    # Run the TTS in a separate thread
+    thread = threading.Thread(target=tts)
+    thread.start()
+
 def recognize_speech():
-    if st.sidebar.checkbox("Use Microphone", True):  # Option to toggle microphone or text input
-        with sr.Microphone() as source:
-            st.write("Listening...")
-            recognizer.adjust_for_ambient_noise(source)
-            audio = recognizer.listen(source)
-            try:
+    try:
+        if st.sidebar.checkbox("Use Microphone", True, key="microphone_checkbox"):
+            with sr.Microphone() as source:
+                st.write("Listening...")
+                recognizer.adjust_for_ambient_noise(source)
+                audio = recognizer.listen(source)
                 text = recognizer.recognize_google(audio)
                 st.write(f"Recognized text: {text}")
                 return text
-            except sr.UnknownValueError:
-                return "Sorry, I did not understand that."
-            except sr.RequestError:
-                return "Sorry, the service is down."
-    else:
-        return st.text_input("Enter your text here:")
+    except sr.UnknownValueError:
+        return "Sorry, I did not understand that."
+    except sr.RequestError:
+        return "Sorry, the service is down."
 
-def chat_with_gpt(prompt):
+def chat_with_gemini(prompt):
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": "You are a drive-in assistant. Help customers with their orders."},
-                {"role": "user", "content": prompt}
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        data = {
+            'contents': [
+                {
+                    'role': 'user',
+                    'parts': [{'text': prompt}]
+                }
             ]
+        }
+        response = requests.post(
+            f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
+            headers=headers,
+            json=data
         )
-        return response['choices'][0]['message']['content']
+        response.raise_for_status()
+        response_json = response.json()
+        
+        if 'candidates' in response_json and len(response_json['candidates']) > 0:
+            return response_json['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return "Sorry, I'm unable to process your request right now."
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}")
+        return "Sorry, I'm unable to process your request right now."
     except Exception as e:
-        st.write(f"Error fetching GPT-4 Turbo response: {e}")
+        print(f"Error fetching Gemini API response: {e}")
         return "Sorry, I'm unable to process your request right now."
 
 def get_menu():
     try:
-        # Update this path to the actual path of your CSV file
         menu_df = pd.read_csv('kfc menu - Sheet1.csv')
-        # Ensure the CSV columns match your code or adjust the column names accordingly
         menu = menu_df.to_dict(orient='records')
         return menu
-    except FileNotFoundError:
-        st.write("Menu file not found. Please check the file path.")
-        return None
-    except pd.errors.EmptyDataError:
-        st.write("Menu file is empty.")
-        return None
-    except pd.errors.ParserError:
-        st.write("Error parsing the menu file. Please check the file format.")
-        return None
     except Exception as e:
         st.write(f"Error reading menu: {e}")
         return None
 
 def get_item_details(deal_name, menu):
+    deal_name = deal_name.lower().strip()
     for item in menu:
-        if item['Deal'].lower() == deal_name.lower():
+        item_deal_name = item['Deal'].lower().strip()
+        if item_deal_name == deal_name:
             return item
     return None
 
 # Streamlit app layout
 st.title("Voice Assistant Interface")
 
-# Display HTML content
 html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -152,67 +173,76 @@ html_content = """
 </html>
 """
 
-html(html_content, height=600)
+st.components.v1.html(html_content, height=600)
 
 if st.button("Start Voice Assistant"):
-    st.write("Welcome to the drive-in! How can I assist you today?")
+    speak_text("Welcome to the drive-in! How can I assist you today?")
     
     order = []
     total_price = 0
 
     menu = get_menu()
     if not menu:
-        st.write("Sorry, I couldn't retrieve the menu at the moment.")
+        speak_text("Sorry, I couldn't retrieve the menu at the moment.")
     else:
         while True:
             user_input = recognize_speech()
-            if user_input is None or user_input.lower() == "":  # Handle cases where no input is provided
-                continue
-
             if "thank you" in user_input.lower():
-                st.write("Goodbye! Have a great day!")
+                speak_text("Goodbye! Have a great day!")
                 break
 
             st.write(f"User input: {user_input}")
             
             if "menu" in user_input.lower():
                 menu_text = "Here is our menu: " + ", ".join([item['Deal'] for item in menu])
-                st.write(menu_text)
-                st.markdown(f"<script>speakText('{menu_text}');</script>", unsafe_allow_html=True)
+                speak_text(menu_text)
 
             elif "price of" in user_input.lower():
                 deal_name = user_input.split("price of")[-1].strip()
                 item_details = get_item_details(deal_name, menu)
                 if item_details:
                     price = item_details['Price (in Rs.)']
-                    description = item_details['Description']
-                    speech = f"The price of {deal_name} is Rs. {price}. Description: {description}"
-                    st.write(speech)
-                    st.markdown(f"<script>speakText('{speech}');</script>", unsafe_allow_html=True)
+                    speak_text(f"The price of {deal_name} is Rs. {price}.")
                 else:
-                    st.write(f"Sorry, I couldn't find the details for {deal_name}.")
-                    st.markdown("<script>speakText('Sorry, I couldn\'t find the details for that item.');</script>", unsafe_allow_html=True)
+                    speak_text(f"Sorry, I couldn't find the details for {deal_name}.")
 
-            elif "add" in user_input.lower():
-                deal_name = user_input.split("add")[-1].strip()
+            elif "description of" in user_input.lower():
+                deal_name = user_input.split("description of")[-1].strip()
                 item_details = get_item_details(deal_name, menu)
                 if item_details:
-                    order.append(item_details)
-                    price = int(item_details['Price (in Rs.)'])
-                    total_price += price
-                    speech = f"Added {deal_name} to your order. Your current total is Rs. {total_price}."
-                    st.write(speech)
-                    st.markdown(f"<script>speakText('{speech}');</script>", unsafe_allow_html=True)
+                    description = item_details['Description']
+                    speak_text(f"The description of {deal_name} is: {description}.")
                 else:
-                    st.write(f"Sorry, I couldn't find {deal_name} on the menu.")
-                    st.markdown("<script>speakText('Sorry, I couldn\'t find that item on the menu.');</script>", unsafe_allow_html=True)
+                    speak_text(f"Sorry, I couldn't find the details for {deal_name}.")
 
-            elif "total amount" in user_input.lower():
-                speech = f"Your current total order amount is Rs. {total_price}."
-                st.write(speech)
-                st.markdown(f"<script>speakText('{speech}');</script>", unsafe_allow_html=True)
+            elif "savings of" in user_input.lower():
+                deal_name = user_input.split("savings of")[-1].strip()
+                item_details = get_item_details(deal_name, menu)
+                if item_details:
+                    savings = item_details['Savings']
+                    speak_text(f"The savings for {deal_name} is {savings}.")
+                else:
+                    speak_text(f"Sorry, I couldn't find the details for {deal_name}.")
+
+            elif "complete order" in user_input.lower():
+                if order:
+                    order_summary = ", ".join([item['Deal'] for item in order])
+                    speak_text(f"Your order includes: {order_summary}. Your total savings for this order is Rs. {total_price}.")
+                else:
+                    speak_text("You have not added any items to your order yet.")
+                break
 
             else:
-                response = chat_with_gpt(user_input)
-                st.write(f"GPT-4 Turbo response: {response}")
-                st.markdown(f"<script>speakText('{response}');</script>", unsafe_allow_html=True)
+                response = chat_with_gemini(user_input)
+                st.write(f"Gemini API response: {response}")
+                speak_text(response)
+                
+                for deal_name in response.split(','):
+                    deal_name = deal_name.strip()
+                    item_details = get_item_details(deal_name, menu)
+                    if item_details:
+                        order.append(item_details)
+                        savings = item_details.get('Savings', "0")
+                        if "Rs." in savings:
+                            savings_value = int(''.join(filter(str.isdigit, savings)))
+                            total_price += savings_value
