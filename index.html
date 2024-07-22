@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            color: white;
+        }
+        .button-container {
+            text-align: center;
+        }
+        .round-button {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-color: #fff;
+            color: #000;
+            border: none;
+            outline: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+        .round-button:hover {
+            background-color: #e0e0e0;
+            box-shadow: 0px 6px 8px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body>
+
+<div class="button-container">
+    <button class="round-button" onclick="startRecognition()">Speak</button>
+    <p id="recognized-text">Press the button and speak...</p>
+</div>
+
+<script>
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = function(event) {
+        const text = event.results[0][0].transcript;
+        document.getElementById('recognized-text').textContent = 'You said: ' + text;
+    };
+
+    recognition.onerror = function(event) {
+        document.getElementById('recognized-text').textContent = 'Error occurred in recognition: ' + event.error;
+    };
+
+    function startRecognition() {
+        document.getElementById('recognized-text').textContent = 'Listening...';
+        recognition.start();
+    }
+</script>
+
+</body>
+</html>
+```
