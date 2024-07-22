@@ -205,3 +205,4 @@ if st.button("Start Voice Assistant"):
                 response = chat_with_gpt(user_input)
                 st.write(f"GPT-4 Turbo response: {response}")
                 st.markdown(f"<script>speakText('{response}');</script>", unsafe_allow_html=True)
+
