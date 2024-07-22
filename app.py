@@ -5,7 +5,6 @@ import openai
 import mysql.connector
 from streamlit.components.v1 import html
 
-# Initialize the necessary components
 openai.api_key = 'YOUR_API_KEY'
 recognizer = sr.Recognizer()
 
@@ -57,10 +56,8 @@ def get_item_details(deal_name, menu):
             return item
     return None
 
-# Streamlit app layout
 st.title("Voice Assistant Interface")
 
-# Display HTML content
 html_content = """
 <!DOCTYPE html>
 <html lang="en">
