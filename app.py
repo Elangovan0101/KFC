@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import speech_recognition as sr
 import requests
@@ -5,7 +6,8 @@ import openai
 import mysql.connector
 from streamlit.components.v1 import html
 
-openai.api_key = 'YOUR_API_KEY'
+# Initialize the necessary components
+openai.api_key = os.getenv('OPENAI_API_KEY')
 recognizer = sr.Recognizer()
 
 def recognize_speech():
@@ -37,18 +39,22 @@ def chat_with_gpt(prompt):
         return "Sorry, I'm unable to process your request right now."
 
 def get_menu():
-    db_connection = mysql.connector.connect(
-        host="127.0.0.1",
-        user="root",
-        password="123456",
-        database="kfc_menu_db"
-    )
-    cursor = db_connection.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM menu")
-    menu = cursor.fetchall()
-    cursor.close()
-    db_connection.close()
-    return menu
+    try:
+        db_connection = mysql.connector.connect(
+            host=os.getenv('DB_HOST', '127.0.0.1'),
+            user=os.getenv('DB_USER', 'root'),
+            password=os.getenv('DB_PASSWORD', '123456'),
+            database=os.getenv('DB_NAME', 'kfc_menu_db')
+        )
+        cursor = db_connection.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM menu")
+        menu = cursor.fetchall()
+        cursor.close()
+        db_connection.close()
+        return menu
+    except mysql.connector.Error as err:
+        st.write(f"Error: {err}")
+        return None
 
 def get_item_details(deal_name, menu):
     for item in menu:
@@ -56,8 +62,10 @@ def get_item_details(deal_name, menu):
             return item
     return None
 
+# Streamlit app layout
 st.title("Voice Assistant Interface")
 
+# Display HTML content
 html_content = """
 <!DOCTYPE html>
 <html lang="en">
