@@ -1,13 +1,11 @@
-import os
 import streamlit as st
 import speech_recognition as sr
-import requests
 import openai
-import mysql.connector
+import pandas as pd
 from streamlit.components.v1 import html
 
 # Initialize the necessary components
-openai.api_key = os.getenv('OPENAI_API_KEY')
+openai.api_key = 'YOUR_API_KEY'
 recognizer = sr.Recognizer()
 
 def recognize_speech():
@@ -40,25 +38,27 @@ def chat_with_gpt(prompt):
 
 def get_menu():
     try:
-        db_connection = mysql.connector.connect(
-            host=os.getenv('DB_HOST', '127.0.0.1'),
-            user=os.getenv('DB_USER', 'root'),
-            password=os.getenv('DB_PASSWORD', '123456'),
-            database=os.getenv('DB_NAME', 'kfc_menu_db')
-        )
-        cursor = db_connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM menu")
-        menu = cursor.fetchall()
-        cursor.close()
-        db_connection.close()
+        # Update this path to the actual path of your CSV file
+        menu_df = pd.read_csv('path/to/your/menu.csv')
+        # Ensure the CSV columns match your code or adjust the column names accordingly
+        menu = menu_df.to_dict(orient='records')
         return menu
-    except mysql.connector.Error as err:
-        st.write(f"Error: {err}")
+    except FileNotFoundError:
+        st.write("Menu file not found. Please check the file path.")
+        return None
+    except pd.errors.EmptyDataError:
+        st.write("Menu file is empty.")
+        return None
+    except pd.errors.ParserError:
+        st.write("Error parsing the menu file. Please check the file format.")
+        return None
+    except Exception as e:
+        st.write(f"Error reading menu: {e}")
         return None
 
 def get_item_details(deal_name, menu):
     for item in menu:
-        if item['deal'].lower() == deal_name.lower():
+        if item['Deal'].lower() == deal_name.lower():
             return item
     return None
 
@@ -170,7 +170,7 @@ if st.button("Start Voice Assistant"):
             st.write(f"User input: {user_input}")
             
             if "menu" in user_input.lower():
-                menu_text = "Here is our menu: " + ", ".join([item['deal'] for item in menu])
+                menu_text = "Here is our menu: " + ", ".join([item['Deal'] for item in menu])
                 st.write(menu_text)
                 st.markdown(f"<script>speakText('{menu_text}');</script>", unsafe_allow_html=True)
 
@@ -178,8 +178,8 @@ if st.button("Start Voice Assistant"):
                 deal_name = user_input.split("price of")[-1].strip()
                 item_details = get_item_details(deal_name, menu)
                 if item_details:
-                    price = item_details['price (inRs.)']
-                    description = item_details['description']
+                    price = item_details['Price (in Rs.)']
+                    description = item_details['Description']
                     speech = f"The price of {deal_name} is Rs. {price}. Description: {description}"
                     st.write(speech)
                     st.markdown(f"<script>speakText('{speech}');</script>", unsafe_allow_html=True)
@@ -192,7 +192,7 @@ if st.button("Start Voice Assistant"):
                 item_details = get_item_details(deal_name, menu)
                 if item_details:
                     order.append(item_details)
-                    price = int(item_details['price (inRs.)'])
+                    price = int(item_details['Price (in Rs.)'])
                     total_price += price
                     speech = f"Added {deal_name} to your order. Your current total is Rs. {total_price}."
                     st.write(speech)
@@ -210,4 +210,3 @@ if st.button("Start Voice Assistant"):
                 response = chat_with_gpt(user_input)
                 st.write(f"GPT-4 Turbo response: {response}")
                 st.markdown(f"<script>speakText('{response}');</script>", unsafe_allow_html=True)
-
