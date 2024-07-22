@@ -9,18 +9,21 @@ openai.api_key = 'YOUR_API_KEY'
 recognizer = sr.Recognizer()
 
 def recognize_speech():
-    with sr.Microphone() as source:
-        st.write("Listening...")
-        recognizer.adjust_for_ambient_noise(source)
-        audio = recognizer.listen(source)
-        try:
-            text = recognizer.recognize_google(audio)
-            st.write(f"Recognized text: {text}")
-            return text
-        except sr.UnknownValueError:
-            return "Sorry, I did not understand that."
-        except sr.RequestError:
-            return "Sorry, the service is down."
+    if st.sidebar.checkbox("Use Microphone", True):  # Option to toggle microphone or text input
+        with sr.Microphone() as source:
+            st.write("Listening...")
+            recognizer.adjust_for_ambient_noise(source)
+            audio = recognizer.listen(source)
+            try:
+                text = recognizer.recognize_google(audio)
+                st.write(f"Recognized text: {text}")
+                return text
+            except sr.UnknownValueError:
+                return "Sorry, I did not understand that."
+            except sr.RequestError:
+                return "Sorry, the service is down."
+    else:
+        return st.text_input("Enter your text here:")
 
 def chat_with_gpt(prompt):
     try:
@@ -163,6 +166,9 @@ if st.button("Start Voice Assistant"):
     else:
         while True:
             user_input = recognize_speech()
+            if user_input is None or user_input.lower() == "":  # Handle cases where no input is provided
+                continue
+
             if "thank you" in user_input.lower():
                 st.write("Goodbye! Have a great day!")
                 break
