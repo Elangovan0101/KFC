@@ -39,7 +39,7 @@ def chat_with_gpt(prompt):
 def get_menu():
     try:
         # Update this path to the actual path of your CSV file
-        menu_df = pd.read_csv('path/to/your/menu.csv')
+        menu_df = pd.read_csv('kfc menu - Sheet1.csv')
         # Ensure the CSV columns match your code or adjust the column names accordingly
         menu = menu_df.to_dict(orient='records')
         return menu
